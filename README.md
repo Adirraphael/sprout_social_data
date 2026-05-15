@@ -37,7 +37,7 @@ Data is available from **January 1, 2026** onwards — this is when APTIM Corp. 
 - Instagram
 - YouTube
 - Twitter / X
-- Google My Business (last 30 days only — API limitation)
+- Google My Business
 
 ## Requesting Additional Date Ranges
 
