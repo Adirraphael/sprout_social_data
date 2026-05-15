@@ -1,0 +1,37 @@
+name: Sprout Social Data Sync
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 8am UTC
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install requests pandas google-cloud-bigquery google-auth pyarrow python-dotenv
+
+      - name: Create GCP key file
+        run: |
+          echo '${{ secrets.GCP_KEY_JSON }}' > /tmp/gcp_key.json
+
+      - name: Run sync
+        env:
+          SPROUT_API_TOKEN: ${{ secrets.SPROUT_API_TOKEN }}
+          SPROUT_CUSTOMER_ID: ${{ secrets.SPROUT_CUSTOMER_ID }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_DATASET: ${{ secrets.GCP_DATASET }}
+          GCP_KEY_PATH: /tmp/gcp_key.json
+          SPROUT_START_DATE: ${{ secrets.SPROUT_START_DATE }}
+        run: python data.py
