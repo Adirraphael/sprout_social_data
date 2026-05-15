@@ -12,8 +12,6 @@ The pipeline runs automatically every Monday at 8am UTC via GitHub Actions, repl
 
 Data is available from **January 1, 2026** onwards — this is when APTIM Corp. connected their social profiles to Sprout Social.
 
-> **Note:** The Sprout API has a maximum date range of **1 year per request**. The current script pulls data from January 2026 to today. If historical data beyond 1 year is needed in the future, additional API calls can be added to cover earlier date ranges upon request.
-
 ## BigQuery Tables
 
 | Table | Description | Refresh Method |
@@ -40,26 +38,6 @@ Data is available from **January 1, 2026** onwards — this is when APTIM Corp. 
 - YouTube
 - Twitter / X
 - Google My Business (last 30 days only — API limitation)
-
-## Networks NOT covered
-
-- Paid / Ad data (not available via Sprout API)
-- Google My Business profile analytics (not supported by API)
-- Yelp, TripAdvisor, Glassdoor (API restriction)
-- X / Twitter listening data (API restriction)
-
-## Automation
-
-The pipeline runs via **GitHub Actions** every Monday at 8am UTC. It can also be triggered manually from the Actions tab in GitHub.
-
-All credentials are stored securely as GitHub Secrets and are never exposed in the code.
-
-## Tech Stack
-
-- Python 3.10
-- Google BigQuery
-- GitHub Actions
-- Sprout Social API
 
 ## Requesting Additional Date Ranges
 
