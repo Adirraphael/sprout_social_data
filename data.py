@@ -37,13 +37,13 @@ def sanitize_columns(df):
     df.columns = [col.replace(".", "_").replace(" ", "_") for col in df.columns]
     return df
 
-def load_to_bq(df, table_name, write_mode):
+def load_to_bq(df, table_name):
     if df.empty:
         print(f"  No data for {table_name}, skipping...")
         return
     df = sanitize_columns(df)
     table_id = f"{PROJECT_ID}.{DATASET}.{table_name}"
-    job_config = bigquery.LoadJobConfig(write_disposition=write_mode, autodetect=True)
+    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE", autodetect=True)
     df = df.astype(str)
     job = bq_client.load_table_from_dataframe(df, table_id, job_config=job_config)
     job.result()
@@ -62,7 +62,7 @@ def post(url, body):
 BASE = "https://api.sproutsocial.com"
 
 # ============================================================
-# 1. PROFILES (Replace)
+# 1. PROFILES
 # ============================================================
 print("Pulling profiles...")
 profiles_response = get(f"{BASE}/v1/{CUSTOMER_ID}/metadata/customer")
@@ -77,10 +77,9 @@ for p in all_profiles:
         "native_id": p.get("native_id"),
         "groups": str(p.get("groups", []))
     })
-load_to_bq(pd.DataFrame(rows), "profiles", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(rows), "profiles")
 profile_ids = [str(p["customer_profile_id"]) for p in all_profiles]
 
-# Group profiles by network type
 profiles_by_network = {}
 for p in all_profiles:
     net = p.get("network_type")
@@ -90,7 +89,7 @@ for p in all_profiles:
     profiles_by_network[net].append(pid)
 
 # ============================================================
-# 2. TAGS (Replace)
+# 2. TAGS
 # ============================================================
 print("Pulling tags...")
 data = get(f"{BASE}/v1/{CUSTOMER_ID}/metadata/customer/tags")
@@ -104,10 +103,10 @@ for t in data.get("data", []):
         "any_group": t.get("any_group"),
         "groups": str(t.get("groups", []))
     })
-load_to_bq(pd.DataFrame(rows), "tags", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(rows), "tags")
 
 # ============================================================
-# 3. GROUPS (Replace)
+# 3. GROUPS
 # ============================================================
 print("Pulling groups...")
 data = get(f"{BASE}/v1/{CUSTOMER_ID}/metadata/customer/groups")
@@ -117,11 +116,11 @@ for g in data.get("data", []):
         "group_id": g.get("group_id"),
         "name": g.get("name")
     })
-load_to_bq(pd.DataFrame(rows), "groups", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(rows), "groups")
 group_ids = [str(g["group_id"]) for g in data.get("data", [])]
 
 # ============================================================
-# 4. USERS (Replace)
+# 4. USERS
 # ============================================================
 print("Pulling users...")
 data = get(f"{BASE}/v1/{CUSTOMER_ID}/metadata/customer/users")
@@ -132,10 +131,10 @@ for u in data.get("data", []):
         "name": u.get("name"),
         "email": u.get("email")
     })
-load_to_bq(pd.DataFrame(rows), "users", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(rows), "users")
 
 # ============================================================
-# 5. TEAMS (Replace)
+# 5. TEAMS
 # ============================================================
 print("Pulling teams...")
 data = get(f"{BASE}/v1/{CUSTOMER_ID}/metadata/customer/teams")
@@ -146,10 +145,10 @@ for t in data.get("data", []):
         "name": t.get("name"),
         "description": t.get("description")
     })
-load_to_bq(pd.DataFrame(rows), "teams", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(rows), "teams")
 
 # ============================================================
-# 6. QUEUES (Replace)
+# 6. QUEUES
 # ============================================================
 print("Pulling queues...")
 data = get(f"{BASE}/v1/{CUSTOMER_ID}/metadata/customer/queues")
@@ -161,10 +160,10 @@ for q in data.get("data", []):
         "description": q.get("description"),
         "associated_teams": str(q.get("associated_teams", []))
     })
-load_to_bq(pd.DataFrame(rows), "queues", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(rows), "queues")
 
 # ============================================================
-# 7. TOPICS (Replace)
+# 7. TOPICS
 # ============================================================
 print("Pulling topics...")
 data = get(f"{BASE}/v1/{CUSTOMER_ID}/metadata/customer/topics")
@@ -180,10 +179,10 @@ for t in data.get("data", []):
         "group_id": t.get("group_id"),
         "availability_time": t.get("availability_time")
     })
-load_to_bq(pd.DataFrame(rows), "topics", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(rows), "topics")
 
 # ============================================================
-# 8. PROFILE ANALYTICS PER NETWORK (Append)
+# 8. PROFILE ANALYTICS
 # ============================================================
 print("Pulling profile analytics...")
 
@@ -261,10 +260,10 @@ for network_type, pids in profiles_by_network.items():
             break
         page += 1
 
-load_to_bq(pd.DataFrame(all_analytics_rows), "profile_analytics", "WRITE_APPEND")
+load_to_bq(pd.DataFrame(all_analytics_rows), "profile_analytics")
 
 # ============================================================
-# 9. POST ANALYTICS PER NETWORK (Replace)
+# 9. POST ANALYTICS
 # ============================================================
 print("Pulling post analytics...")
 
@@ -365,15 +364,14 @@ for network_type, pids in profiles_by_network.items():
         if len(batch) < 100:
             break
 
-load_to_bq(pd.DataFrame(all_post_rows), "post_analytics", "WRITE_TRUNCATE")
+load_to_bq(pd.DataFrame(all_post_rows), "post_analytics")
 
 # ============================================================
-# 10. MESSAGES (Append)
+# 10. MESSAGES
 # ============================================================
 print("Pulling messages...")
 rows = []
 
-# Build group to profiles mapping
 group_to_profiles = {}
 for p in all_profiles:
     pid = str(p.get("customer_profile_id"))
@@ -389,7 +387,6 @@ for group_id in group_ids:
         print(f"  No profiles found for group {group_id}, skipping...")
         continue
 
-    # Split GMB and non-GMB profiles
     gmb_pids = [str(p.get("customer_profile_id")) for p in all_profiles
                 if str(p.get("customer_profile_id")) in group_profile_ids
                 and p.get("network_type") == "google_my_business"]
@@ -397,7 +394,6 @@ for group_id in group_ids:
                     if str(p.get("customer_profile_id")) in group_profile_ids
                     and p.get("network_type") != "google_my_business"]
 
-    # Create list of batches — non-GMB and GMB separately
     profile_batches = []
     if non_gmb_pids:
         profile_batches.append(("non_gmb", non_gmb_pids, START_DATE))
@@ -460,10 +456,10 @@ for group_id in group_ids:
             if not page_cursor:
                 break
 
-load_to_bq(pd.DataFrame(rows), "messages", "WRITE_APPEND")
+load_to_bq(pd.DataFrame(rows), "messages")
 
 # ============================================================
-# 11. CASES (Append) - pull week by week
+# 11. CASES
 # ============================================================
 print("Pulling cases...")
 rows = []
@@ -511,10 +507,10 @@ while current < end:
             break
     current += timedelta(days=7)
 
-load_to_bq(pd.DataFrame(rows), "cases", "WRITE_APPEND")
+load_to_bq(pd.DataFrame(rows), "cases")
 
 # ============================================================
-# 12 & 13. LISTENING (Replace)
+# 12 & 13. LISTENING
 # ============================================================
 if topic_ids:
     print("Pulling listening data...")
@@ -538,7 +534,6 @@ if topic_ids:
     for topic_id in topic_ids:
         print(f"  Pulling listening data for topic {topic_id}...")
 
-        # Listening Messages
         page = 1
         while True:
             body = {
@@ -593,7 +588,6 @@ if topic_ids:
                 break
             page += 1
 
-        # Listening Metrics
         body = {
             "filters": [
                 f"created_time.in({START_DATE}..{END_DATE})",
@@ -620,8 +614,8 @@ if topic_ids:
                     row[k.replace(".", "_")] = v
                 all_listening_metric_rows.append(row)
 
-    load_to_bq(pd.DataFrame(all_listening_message_rows), "listening_messages", "WRITE_TRUNCATE")
-    load_to_bq(pd.DataFrame(all_listening_metric_rows), "listening_metrics", "WRITE_TRUNCATE")
+    load_to_bq(pd.DataFrame(all_listening_message_rows), "listening_messages")
+    load_to_bq(pd.DataFrame(all_listening_metric_rows), "listening_metrics")
 
 else:
     print("No listening topics found, skipping...")
